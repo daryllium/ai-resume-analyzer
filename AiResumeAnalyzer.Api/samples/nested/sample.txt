@@ -1,5 +1,0 @@
-Jane Doe
-jane@email.com
-Skills: C#, ASP.NET, SQL
-Experience: 5 years
-Education: BSc in Computer Science

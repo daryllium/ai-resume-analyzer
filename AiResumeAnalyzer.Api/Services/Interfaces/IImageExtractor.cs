@@ -1,0 +1,1 @@
+namespace AiResumeAnalyzer.Api.Services;

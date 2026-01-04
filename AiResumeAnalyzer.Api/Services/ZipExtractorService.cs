@@ -5,18 +5,17 @@ using Microsoft.Extensions.Options;
 
 namespace AiResumeAnalyzer.Api.Services;
 
-public sealed class ExtractorService : IExtractorService
+public sealed class ZipExtractorService(
+    ITextExtractor _textExtractor,
+    IOptions<ZipOptions> zipOptions,
+    ILogger<ZipExtractorService> logger
+) : IZipExtractor
 {
-    private readonly ZipOptions _zipOptions;
-    private readonly ILogger _logger;
+    private readonly ZipOptions _zipOptions = zipOptions.Value;
+    private readonly ILogger _logger = logger;
+    private readonly ITextExtractor _textExtractor = _textExtractor;
 
-    public ExtractorService(IOptions<ZipOptions> zipOptions, ILogger<ExtractorService> logger)
-    {
-        _zipOptions = zipOptions.Value;
-        _logger = logger;
-    }
-
-    public ExtractResponse Extract(ExtractRequest req)
+    public async Task<ExtractResponse> Extract(ExtractRequest req)
     {
         var items = new List<ExtractItemResult>();
 
@@ -36,13 +35,20 @@ public sealed class ExtractorService : IExtractorService
                 if (f.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                     continue;
 
+                using var stream = f.OpenReadStream();
+                var result = await _textExtractor.ExtractTextAsync(
+                    stream,
+                    f.FileName,
+                    f.ContentType
+                );
+
                 items.Add(
                     new ExtractItemResult(
                         "file",
                         f.FileName,
-                        true,
-                        $"[RECEIVED FILE] name={f.FileName} contentType={f.ContentType} length={f.Length}",
-                        null
+                        result.Success,
+                        result.ExtractedText,
+                        result.ErrorMessage
                     )
                 );
             }
@@ -51,7 +57,7 @@ public sealed class ExtractorService : IExtractorService
         if (req.ZipFile is not null)
         {
             using var zs = req.ZipFile.OpenReadStream();
-            var expanded = ZipExpander.ExpandZipRecursive(
+            var expanded = ZipExpanderService.ExpandZipRecursive(
                 zs,
                 req.ZipFile.FileName,
                 _zipOptions,
@@ -60,13 +66,19 @@ public sealed class ExtractorService : IExtractorService
 
             foreach (var zi in expanded.Items)
             {
+                using var contentStream = new MemoryStream(zi.Content);
+                var result = await _textExtractor.ExtractTextAsync(
+                    contentStream,
+                    zi.FileName,
+                    GetContentTypeFromFileName(zi.FileName)
+                );
                 items.Add(
                     new ExtractItemResult(
                         "zip-entry",
                         zi.EntryPath,
-                        true,
-                        $"[RECEIVED ZIP ENTRY] name={zi.FileName} size={zi.Content.Length} bytes",
-                        null
+                        result.Success,
+                        result.ExtractedText,
+                        result.ErrorMessage
                     )
                 );
             }
@@ -96,5 +108,17 @@ public sealed class ExtractorService : IExtractorService
         var failed = items.Count(x => !x.Success);
 
         return new ExtractResponse(items, new ExtractMeta(items.Count, success, failed));
+    }
+
+    private string GetContentTypeFromFileName(string fileName)
+    {
+        if (fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            return "application/pdf";
+        if (fileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        if (fileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+            return "text/plain";
+
+        return "application/octet-stream";
     }
 }

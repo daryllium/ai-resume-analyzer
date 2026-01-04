@@ -11,7 +11,10 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.Configure<ZipOptions>(builder.Configuration.GetSection("ZipOptions"));
 builder.Services.AddSingleton<IAnalyzerService, AnalyzerService>();
-builder.Services.AddSingleton<IExtractorService, ExtractorService>();
+builder.Services.AddSingleton<IZipExtractor, ZipExtractorService>();
+builder.Services.AddSingleton<ITextExtractor, TextExtractor>();
+builder.Services.AddSingleton<IPdfExtractor, PdfExtractor>();
+builder.Services.AddSingleton<IDocxExtractor, DocxExtractor>();
 
 var app = builder.Build();
 
@@ -29,7 +32,7 @@ app.MapPost(
 
 app.MapPost(
         "/api/extract",
-        ([FromServices] IExtractorService svc, [FromForm] ExtractRequest req) =>
+        ([FromServices] IZipExtractor svc, [FromForm] ExtractRequest req) =>
         {
             var resp = svc.Extract(req);
             return Results.Ok(resp);

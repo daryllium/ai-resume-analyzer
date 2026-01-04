@@ -3,7 +3,7 @@ using AiResumeAnalyzer.Api.Options;
 
 namespace AiResumeAnalyzer.Api.Services;
 
-public static class ZipExpander
+public static class ZipExpanderService
 {
     public sealed record ZipItem(string EntryPath, string FileName, byte[] Content);
 
