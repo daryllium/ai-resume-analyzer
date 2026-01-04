@@ -3,7 +3,7 @@ using AiResumeAnalyzer.Api.Requests;
 
 namespace AiResumeAnalyzer.Api.Services;
 
-public interface IZipExtractor
+public interface IAnalyzer
 {
-    Task<ExtractResponse> Extract(ExtractRequest req);
+    Task<AnalyzeResponse> AnalyzeAsync(AnalyzeRequest request);
 }

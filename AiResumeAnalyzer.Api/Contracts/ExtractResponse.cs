@@ -10,4 +10,10 @@ public sealed record ExtractItemResult(
     string? Error
 );
 
+public sealed record TextExtractionResult(
+    bool Success,
+    string? ExtractedText,
+    string? ErrorMessage
+);
+
 public sealed record ExtractMeta(int TotalItems, int SuccessCount, int FailedCount);
