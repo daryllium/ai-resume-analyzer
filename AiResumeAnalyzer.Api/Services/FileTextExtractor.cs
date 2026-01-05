@@ -53,7 +53,22 @@ public sealed class FileTextExtractor() : IFileTextExtractor
             text.AppendLine(page.Text);
         }
 
-        return text.ToString();
+        var extractedText = text.ToString();
+
+        // Detect if this is a scanned PDF (insufficient extractable text)
+        if (extractedText.Length < 500)
+        {
+            // Check if this might be a scanned PDF by examining text density
+            var textDensity = extractedText.Length / Math.Max(1, document.NumberOfPages);
+            if (textDensity < 100) // Less than ~100 chars per page average
+            {
+                throw new InvalidOperationException(
+                    "This appears to be a scanned PDF with minimal extractable text. Images are not supported."
+                );
+            }
+        }
+
+        return extractedText;
     }
 
     private async Task<string> ExtractTextFromDocxAsync(Stream docxStream)

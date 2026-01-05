@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Http;
-
 namespace AiResumeAnalyzer.Api.Requests;
 
 public sealed class ExtractRequest

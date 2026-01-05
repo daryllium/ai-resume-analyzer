@@ -11,7 +11,9 @@ public sealed class TextInputExtractor : ITextInputExtractor
         for (int i = 0; i < textInputs.Count; i++)
         {
             var text = textInputs[i] ?? string.Empty;
-            items.Add(new ExtractItemResult("text", $"textInput[{i}]", true, text, null));
+            items.Add(
+                new ExtractItemResult("text", $"textInput[{i}]", true, text, null, text.Length)
+            );
         }
 
         var success = items.Count(i => i.Success);

@@ -14,6 +14,8 @@ builder.Services.AddSingleton<IAnalyzer, Analyzer>();
 builder.Services.AddSingleton<ITextInputExtractor, TextInputExtractor>();
 builder.Services.AddSingleton<IFileTextExtractor, FileTextExtractor>();
 builder.Services.AddSingleton<IUploadFileExtractor, UploadFileExtractor>();
+builder.Services.AddHttpClient<IAiModelClient, AiModelClient>();
+builder.Services.AddSingleton<IAiModelClient, AiModelClient>();
 
 var app = builder.Build();
 

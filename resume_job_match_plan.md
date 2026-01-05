@@ -31,7 +31,6 @@ The backend:
   - DOCX extraction
   - TXT passthrough
   - ZIP recursive extraction
-  - OCR for images + scanned PDFs
 - AI orchestration via **Ollama HTTP API**
 - Output: strict JSON schemas (job, candidate, result)
 
@@ -65,17 +64,7 @@ The backend:
 
 ---
 
-## OCR requirements
-OCR is required because you will accept:
-- Images (PNG/JPG/etc.)
-- Scanned PDFs (no embedded text)
 
-Implementation notes:
-- Detect if PDF has extractable text:
-  - If extracted text length is below a threshold (e.g., < 500 chars), treat as scanned → OCR
-- OCR should be encapsulated behind an interface so you can swap providers later.
-
----
 
 ## AI design
 ### Model
@@ -120,7 +109,6 @@ Keep thresholds in config.
   - max files: 10
   - max zip size (e.g., 25–50MB initially)
   - max individual file size (e.g., 10MB)
-- Timeouts per resume to avoid runaway OCR/model calls.
 
 ---
 
@@ -204,7 +192,6 @@ You may still parse the JD into a structured internal shape to improve consisten
 - Accept multipart with JD + files[] + zipFile
 - Recursive zip expansion
 - Extract text from TXT/DOCX/PDF(text)
-- OCR for images + scanned PDFs
 - Return extracted text lengths + filenames (debug response)
 
 ### M2 — AI: job parsing + resume parsing
@@ -229,13 +216,11 @@ You may still parse the JD into a structured internal shape to improve consisten
 
 ## Implementation notes (key classes / interfaces)
 - `IFileExtractor` (PDF/DOCX/TXT)
-- `IOcrService` (image + scanned PDF pages)
 - `IModelClient` (Ollama now, cloud later)
 - `IJobParser`, `IResumeParser`, `IMatcher`
 - `AnalysisOrchestrator` (end-to-end coordination)
 
 Keep providers behind interfaces to swap:
-- OCR provider
 - AI provider
 - PDF generator
 
@@ -250,6 +235,5 @@ Keep providers behind interfaces to swap:
 
 ## Open decisions (later)
 - Hosting details on Render (storage, scaling)
-- Cloud OCR provider vs local OCR
 - Async job queue for larger batches
 - UI/UX improvements and comparison views

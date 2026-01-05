@@ -7,7 +7,8 @@ public sealed record ExtractItemResult(
     string SourceName,
     bool Success,
     string? ExtractedText,
-    string? Error
+    string? Error,
+    int? TextLength
 );
 
 public sealed record TextExtractionResult(

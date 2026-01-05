@@ -33,7 +33,8 @@ public sealed class UploadFileExtractor(IFileTextExtractor fileTextExtractor) : 
                         file.FileName,
                         result.Success,
                         result.ExtractedText,
-                        result.ErrorMessage
+                        result.ErrorMessage,
+                        result.ExtractedText?.Length ?? 0
                     )
                 );
             }
@@ -74,7 +75,8 @@ public sealed class UploadFileExtractor(IFileTextExtractor fileTextExtractor) : 
                     $"{zipFile.FileName}:{entry.FullName}",
                     extractResult.Success,
                     extractResult.ExtractedText,
-                    extractResult.ErrorMessage
+                    extractResult.ErrorMessage,
+                    extractResult.ExtractedText?.Length ?? 0
                 )
             );
         }
