@@ -48,10 +48,14 @@ public sealed class UploadFileExtractor(IFileTextExtractor fileTextExtractor) : 
 
     private async Task<List<ExtractItemResult>> ExtractZipFileAsync(IFormFile zipFile)
     {
-        var results = new List<ExtractItemResult>();
-
         using var zipStream = zipFile.OpenReadStream();
-        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        return await ExtractZipStreamAsync(zipStream, zipFile.FileName);
+    }
+
+    private async Task<List<ExtractItemResult>> ExtractZipStreamAsync(Stream zipStream, string parentSource)
+    {
+        var results = new List<ExtractItemResult>();
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true);
 
         foreach (var entry in archive.Entries)
         {
@@ -63,22 +67,33 @@ public sealed class UploadFileExtractor(IFileTextExtractor fileTextExtractor) : 
             await entryStream.CopyToAsync(memoryStream);
             memoryStream.Position = 0;
 
-            var extractResult = await _fileTextExtractor.ExtractFileTextAsync(
-                memoryStream,
-                entry.FullName,
-                GetContentTypeFromFileName(entry.Name)
-            );
+            string currentSourceName = $"{parentSource}:{entry.FullName}";
 
-            results.Add(
-                new ExtractItemResult(
-                    "zip-entry",
-                    $"{zipFile.FileName}:{entry.FullName}",
-                    extractResult.Success,
-                    extractResult.ExtractedText,
-                    extractResult.ErrorMessage,
-                    extractResult.ExtractedText?.Length ?? 0
-                )
-            );
+            if (entry.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                // Recursive call
+                var innerResults = await ExtractZipStreamAsync(memoryStream, currentSourceName);
+                results.AddRange(innerResults);
+            }
+            else
+            {
+                var extractResult = await _fileTextExtractor.ExtractFileTextAsync(
+                    memoryStream,
+                    entry.FullName,
+                    GetContentTypeFromFileName(entry.Name)
+                );
+
+                results.Add(
+                    new ExtractItemResult(
+                        "zip-entry",
+                        currentSourceName,
+                        extractResult.Success,
+                        extractResult.ExtractedText,
+                        extractResult.ErrorMessage,
+                        extractResult.ExtractedText?.Length ?? 0
+                    )
+                );
+            }
         }
 
         return results;

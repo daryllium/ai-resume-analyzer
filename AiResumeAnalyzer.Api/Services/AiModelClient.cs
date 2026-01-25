@@ -22,7 +22,7 @@ public sealed class AiModelClient(HttpClient httpClient, ILogger<AiModelClient> 
     )
         where T : class
     {
-        try { }
+        try { throw new NotImplementedException(); }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating JSON response from AI model");
@@ -36,7 +36,7 @@ public sealed class AiModelClient(HttpClient httpClient, ILogger<AiModelClient> 
         string modelName = _modelName
     )
     {
-        try { }
+        try { throw new NotImplementedException(); }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating text response from AI model");
