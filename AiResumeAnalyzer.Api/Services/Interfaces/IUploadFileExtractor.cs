@@ -4,5 +4,8 @@ namespace AiResumeAnalyzer.Api.Services;
 
 public interface IUploadFileExtractor
 {
-    Task<ExtractResponse> ExtractFileAsync(IEnumerable<IFormFile> files);
+    Task<ExtractResponse> ExtractFileAsync(
+        IEnumerable<IFormFile> files,
+        CancellationToken cancellationToken = default
+    );
 }

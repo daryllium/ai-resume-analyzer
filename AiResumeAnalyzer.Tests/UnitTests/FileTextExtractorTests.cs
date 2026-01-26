@@ -1,6 +1,8 @@
-using System.IO;
 using System.Text;
 using AiResumeAnalyzer.Api.Services;
+using AiResumeAnalyzer.Api.Services.Interfaces;
+using Microsoft.Extensions.Logging;
+using Moq;
 
 namespace AiResumeAnalyzer.Tests.UnitTests;
 
@@ -9,11 +11,13 @@ namespace AiResumeAnalyzer.Tests.UnitTests;
 /// </summary>
 public class FileTextExtractorTests
 {
+    private readonly Mock<IOcrService> _mockOcrService = new();
+    private readonly Mock<ILogger<FileTextExtractor>> _mockLogger = new();
     private readonly FileTextExtractor _fileTextExtractor;
 
     public FileTextExtractorTests()
     {
-        _fileTextExtractor = new FileTextExtractor();
+        _fileTextExtractor = new FileTextExtractor(_mockOcrService.Object, _mockLogger.Object);
     }
 
     [Fact]
@@ -136,7 +140,7 @@ public class FileTextExtractorTests
     [InlineData("test.markdown", true, "text/markdown")]
     [InlineData("test.unknown", true, "text/plain")] // Content type makes it text
     [InlineData("test.xyz", false, "application/octet-stream")]
-    [InlineData("test.jpg", false, "image/jpeg")]
+    [InlineData("test.jpg", true, "image/jpeg")]
     [InlineData("test.pdf", false, "application/pdf")] // PDF extension with non-text content
     [InlineData(
         "test.docx",
@@ -152,6 +156,13 @@ public class FileTextExtractorTests
         // Arrange
         var content = Encoding.UTF8.GetBytes("Sample text content for testing");
         var stream = new MemoryStream(content);
+
+        _mockOcrService
+            .Setup(x => x.ExtractTextFromImageAsync(It.IsAny<Stream>()))
+            .ReturnsAsync("Extracted OCR Text");
+        _mockOcrService
+            .Setup(x => x.ExtractTextFromPdfPagesAsync(It.IsAny<Stream>()))
+            .ReturnsAsync("Extracted OCR PDF Text");
 
         // Act
         var result = await _fileTextExtractor.ExtractFileTextAsync(stream, fileName, contentType);

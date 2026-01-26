@@ -1,6 +1,12 @@
+using AiResumeAnalyzer.Api.Contracts;
+using AiResumeAnalyzer.Api.Options;
 using AiResumeAnalyzer.Api.Requests;
 using AiResumeAnalyzer.Api.Services;
+using AiResumeAnalyzer.Api.Services.Interfaces;
+using AiResumeAnalyzer.Tests.UnitTests;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace AiResumeAnalyzer.Tests.UnitTests;
@@ -9,11 +15,55 @@ public class AnalyzerTests
 {
     private readonly Mock<IUploadFileExtractor> _mockUploadFileExtractor = new();
     private readonly Mock<ITextInputExtractor> _mockTextInputExtractor = new();
+    private readonly Mock<IJobParser> _mockJobParser = new();
+    private readonly Mock<IResumeParser> _mockResumeParser = new();
+    private readonly Mock<IMatcher> _mockMatcher = new();
+    private readonly Mock<ILogger<Analyzer>> _mockLogger = new();
     private readonly Analyzer _analyzer;
 
     public AnalyzerTests()
     {
-        _analyzer = new Analyzer(_mockUploadFileExtractor.Object, _mockTextInputExtractor.Object);
+        _analyzer = new Analyzer(
+            _mockUploadFileExtractor.Object,
+            _mockTextInputExtractor.Object,
+            _mockJobParser.Object,
+            _mockResumeParser.Object,
+            _mockMatcher.Object,
+            Options.Create(new AiModelOptions()),
+            _mockLogger.Object
+        );
+
+        // Default setup for Matcher to return a dummy analysis
+        _mockMatcher
+            .Setup(x => x.MatchAsync(It.IsAny<JobProfile>(), It.IsAny<CandidateProfile>()))
+            .ReturnsAsync(
+                new AnalyzeResultItem(
+                    SourceName: "Test Source",
+                    Success: true,
+                    Candidate: new CandidateProfile(
+                        "Test Name",
+                        "test@example.com",
+                        new List<string>(),
+                        0,
+                        new List<string>(),
+                        new List<string>(),
+                        "Test summary"
+                    ),
+                    MatchScore: 100,
+                    MatchLevel: "Expert",
+                    MissingSkills: new List<string>(),
+                    IsRecommended: true,
+                    AnalysisSummary: "Great candidate"
+                )
+            );
+
+        _mockJobParser
+            .Setup(x => x.ParseJobDescriptionAsync(It.IsAny<string>()))
+            .ReturnsAsync(new JobProfile("Title", [], [], 0, "Summary"));
+
+        _mockResumeParser
+            .Setup(x => x.ParseResumeAsync(It.IsAny<string>()))
+            .ReturnsAsync(new CandidateProfile("Test", "test@test.com", [], 0, [], [], "Summary"));
     }
 
     [Fact]

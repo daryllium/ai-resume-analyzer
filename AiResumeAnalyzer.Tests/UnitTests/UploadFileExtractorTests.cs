@@ -1,5 +1,8 @@
+using AiResumeAnalyzer.Api.Options;
 using AiResumeAnalyzer.Api.Services;
+using AiResumeAnalyzer.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace AiResumeAnalyzer.Tests.UnitTests;
@@ -11,7 +14,11 @@ public class UploadFileExtractorTests
 
     public UploadFileExtractorTests()
     {
-        _uploadFileExtractor = new UploadFileExtractor(_mockFileTextExtractor.Object);
+        _uploadFileExtractor = new UploadFileExtractor(
+            _mockFileTextExtractor.Object,
+            Options.Create(new FileLimitOptions()),
+            Options.Create(new ZipOptions())
+        );
     }
 
     [Fact]

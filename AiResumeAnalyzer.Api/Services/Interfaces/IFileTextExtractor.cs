@@ -7,6 +7,7 @@ public interface IFileTextExtractor
     Task<TextExtractionResult> ExtractFileTextAsync(
         Stream fileStream,
         string fileName,
-        string contentType
+        string contentType,
+        CancellationToken cancellationToken = default
     );
 }

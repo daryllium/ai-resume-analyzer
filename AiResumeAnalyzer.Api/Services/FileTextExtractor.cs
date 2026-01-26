@@ -1,17 +1,23 @@
 using System.Text;
 using AiResumeAnalyzer.Api.Contracts;
+using AiResumeAnalyzer.Api.Services.Interfaces;
 using DocumentFormat.OpenXml.Drawing;
 using DocumentFormat.OpenXml.Packaging;
 using UglyToad.PdfPig;
 
 namespace AiResumeAnalyzer.Api.Services;
 
-public sealed class FileTextExtractor() : IFileTextExtractor
+public sealed class FileTextExtractor(IOcrService ocrService, ILogger<FileTextExtractor> logger)
+    : IFileTextExtractor
 {
+    private readonly IOcrService _ocrService = ocrService;
+    private readonly ILogger<FileTextExtractor> _logger = logger;
+
     public async Task<TextExtractionResult> ExtractFileTextAsync(
         Stream fileStream,
         string fileName,
-        string contentType
+        string contentType,
+        CancellationToken cancellationToken = default
     )
     {
         try
@@ -21,8 +27,24 @@ public sealed class FileTextExtractor() : IFileTextExtractor
 
             if (fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             {
-                var text = await ExtractTextFromPdfAsync(fileStream);
-                return new TextExtractionResult(true, text, null);
+                try
+                {
+                    var text = await ExtractTextFromPdfAsync(fileStream);
+                    return new TextExtractionResult(true, text, null);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger.LogInformation(
+                        "Text-based PDF extraction failed for {FileName}. Falling back to OCR. Reason: {Message}",
+                        fileName,
+                        ex.Message
+                    );
+                    var ocrText = await _ocrService.ExtractTextFromPdfPagesAsync(
+                        fileStream,
+                        cancellationToken
+                    );
+                    return new TextExtractionResult(true, ocrText, null);
+                }
             }
             else if (fileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
             {
@@ -31,7 +53,15 @@ public sealed class FileTextExtractor() : IFileTextExtractor
             }
             else if (IsTextFile(fileName, contentType))
             {
-                var text = await ExtractTextFromTxtAsync(fileStream);
+                var text = await ExtractTextFromTxtAsync(fileStream, cancellationToken);
+                return new TextExtractionResult(true, text, null);
+            }
+            else if (IsImageFile(fileName, contentType))
+            {
+                var text = await _ocrService.ExtractTextFromImageAsync(
+                    fileStream,
+                    cancellationToken
+                );
                 return new TextExtractionResult(true, text, null);
             }
 
@@ -56,15 +86,13 @@ public sealed class FileTextExtractor() : IFileTextExtractor
         var extractedText = text.ToString();
 
         // Detect if this is a scanned PDF (insufficient extractable text)
-        if (extractedText.Length < 500)
+        // If the document has pages but almost no text (average < 100 chars per page), treat as scanned.
+        if (document.NumberOfPages > 0)
         {
-            // Check if this might be a scanned PDF by examining text density
-            var textDensity = extractedText.Length / Math.Max(1, document.NumberOfPages);
-            if (textDensity < 100) // Less than ~100 chars per page average
+            var textDensity = extractedText.Length / document.NumberOfPages;
+            if (textDensity < 100)
             {
-                throw new InvalidOperationException(
-                    "This appears to be a scanned PDF with minimal extractable text. Images are not supported."
-                );
+                throw new InvalidOperationException("This appears to be a scanned PDF.");
             }
         }
 
@@ -96,10 +124,13 @@ public sealed class FileTextExtractor() : IFileTextExtractor
         return text.ToString();
     }
 
-    private async Task<string> ExtractTextFromTxtAsync(Stream txtStream)
+    private async Task<string> ExtractTextFromTxtAsync(
+        Stream txtStream,
+        CancellationToken cancellationToken
+    )
     {
         using var reader = new StreamReader(txtStream, Encoding.UTF8, leaveOpen: true);
-        return await reader.ReadToEndAsync();
+        return await reader.ReadToEndAsync(cancellationToken);
     }
 
     private bool IsTextFile(string fileName, string contentType)
@@ -107,5 +138,12 @@ public sealed class FileTextExtractor() : IFileTextExtractor
         var txtExtensions = new[] { ".txt", ".text", ".md", ".markdown" };
         return txtExtensions.Any(ext => fileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
             || contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsImageFile(string fileName, string contentType)
+    {
+        var imgExtensions = new[] { ".png", ".jpg", ".jpeg", ".tiff", ".bmp" };
+        return imgExtensions.Any(ext => fileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+            || contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
     }
 }

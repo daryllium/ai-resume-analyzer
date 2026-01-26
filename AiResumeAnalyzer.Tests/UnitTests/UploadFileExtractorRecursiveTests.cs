@@ -1,8 +1,10 @@
 using System.IO.Compression;
 using AiResumeAnalyzer.Api.Contracts;
+using AiResumeAnalyzer.Api.Options;
 using AiResumeAnalyzer.Api.Services;
 using AiResumeAnalyzer.Tests.UnitTests;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace AiResumeAnalyzer.Tests.UnitTests;
@@ -14,7 +16,11 @@ public class UploadFileExtractorRecursiveTests
 
     public UploadFileExtractorRecursiveTests()
     {
-        _uploadFileExtractor = new UploadFileExtractor(_mockFileTextExtractor.Object);
+        _uploadFileExtractor = new UploadFileExtractor(
+            _mockFileTextExtractor.Object,
+            Options.Create(new FileLimitOptions()),
+            Options.Create(new ZipOptions())
+        );
     }
 
     [Fact]
@@ -25,7 +31,7 @@ public class UploadFileExtractorRecursiveTests
         // outer.zip
         //   - inner.zip
         //     - nested_resume.txt
-        
+
         using var memoryStream = new MemoryStream();
         using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
         {
@@ -44,12 +50,14 @@ public class UploadFileExtractorRecursiveTests
         mockFile.Setup(f => f.FileName).Returns("outer.zip");
         mockFile.Setup(f => f.OpenReadStream()).Returns(memoryStream);
         mockFile.Setup(f => f.Length).Returns(memoryStream.Length);
-        
+
         var files = new FormFileCollection { mockFile.Object };
 
         var expectedResult = new TextExtractionResult(true, "Resume Content", null);
         _mockFileTextExtractor
-            .Setup(x => x.ExtractFileTextAsync(It.IsAny<Stream>(), "nested_resume.txt", "text/plain"))
+            .Setup(x =>
+                x.ExtractFileTextAsync(It.IsAny<Stream>(), "nested_resume.txt", "text/plain")
+            )
             .ReturnsAsync(expectedResult);
 
         // Act
@@ -57,10 +65,10 @@ public class UploadFileExtractorRecursiveTests
 
         // Assert
         Assert.NotNull(result);
-        
+
         // We expect finding the nested text file
         Assert.Contains(result.Items, i => i.SourceName.EndsWith("nested_resume.txt") && i.Success);
-        
+
         // Verify we called the extractor for the text file
         _mockFileTextExtractor.Verify(
             x => x.ExtractFileTextAsync(It.IsAny<Stream>(), "nested_resume.txt", "text/plain"),
