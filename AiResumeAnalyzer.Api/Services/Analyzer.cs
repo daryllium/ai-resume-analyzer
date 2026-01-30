@@ -13,6 +13,7 @@ public sealed class Analyzer(
     IResumeParser resumeParser,
     IMatcher matcher,
     IOptions<AiModelOptions> aiOptions,
+    IOptions<FileLimitOptions> fileOptions,
     ILogger<Analyzer> logger
 ) : IAnalyzer
 {
@@ -22,6 +23,7 @@ public sealed class Analyzer(
     private readonly IResumeParser _resumeParser = resumeParser;
     private readonly IMatcher _matcher = matcher;
     private readonly AiModelOptions _aiOptions = aiOptions.Value;
+    private readonly FileLimitOptions _fileOptions = fileOptions.Value;
     private readonly ILogger<Analyzer> _logger = logger;
 
     public async Task<AnalyzeResponse> AnalyzeAsync(
@@ -29,7 +31,7 @@ public sealed class Analyzer(
         CancellationToken cancellationToken = default
     )
     {
-        var sources = await ExtractAllSourcesAsync(request);
+        var sources = await ExtractAllSourcesAsync(request, cancellationToken);
 
         if (sources.Count == 0)
         {
@@ -110,13 +112,19 @@ public sealed class Analyzer(
         );
     }
 
-    private async Task<List<ExtractedSource>> ExtractAllSourcesAsync(AnalyzeRequest request)
+    private async Task<List<ExtractedSource>> ExtractAllSourcesAsync(
+        AnalyzeRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var sources = new List<ExtractedSource>();
 
         if (request.UploadFiles?.Count > 0)
         {
-            var fileResponse = await _uploadFileExtractor.ExtractFileAsync(request.UploadFiles);
+            var fileResponse = await _uploadFileExtractor.ExtractFileAsync(
+                request.UploadFiles,
+                cancellationToken
+            );
             sources.AddRange(
                 fileResponse
                     .Items.Where(x => x.Success && !string.IsNullOrEmpty(x.ExtractedText))
@@ -124,9 +132,12 @@ public sealed class Analyzer(
             );
         }
 
-        if (request.UploadText?.Count > 0)
+        if (sources.Count < _fileOptions.MaxTotalCandidates && request.UploadText?.Count > 0)
         {
-            var textResponse = await _textInputExtractor.ExtractTextInputAsync(request.UploadText);
+            var textResponse = await _textInputExtractor.ExtractTextInputAsync(
+                request.UploadText,
+                cancellationToken
+            );
             sources.AddRange(
                 textResponse
                     .Items.Where(x => x.Success && !string.IsNullOrEmpty(x.ExtractedText))
@@ -134,7 +145,7 @@ public sealed class Analyzer(
             );
         }
 
-        return sources;
+        return sources.Take(_fileOptions.MaxTotalCandidates).ToList();
     }
 
     private record ExtractedSource(string SourceName, string Text);

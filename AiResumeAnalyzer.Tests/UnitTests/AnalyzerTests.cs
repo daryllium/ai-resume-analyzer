@@ -30,6 +30,7 @@ public class AnalyzerTests
             _mockResumeParser.Object,
             _mockMatcher.Object,
             Options.Create(new AiModelOptions()),
+            Options.Create(new FileLimitOptions()),
             _mockLogger.Object
         );
 

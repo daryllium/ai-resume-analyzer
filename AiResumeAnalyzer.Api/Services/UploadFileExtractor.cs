@@ -26,7 +26,7 @@ public sealed class UploadFileExtractor(
 
         foreach (var file in files)
         {
-            if (totalFilesProcessed >= _fileOptions.MaxFileCount)
+            if (totalFilesProcessed >= _fileOptions.MaxTotalCandidates)
             {
                 items.Add(
                     new ExtractItemResult(
@@ -192,7 +192,7 @@ public sealed class UploadFileExtractor(
                 break;
             }
 
-            if (currentFileCount + results.Count(r => r.Success) >= _fileOptions.MaxFileCount)
+            if (currentFileCount + results.Count(r => r.Success) >= _fileOptions.MaxTotalCandidates)
             {
                 break; // Stop adding new files if limit reached
             }

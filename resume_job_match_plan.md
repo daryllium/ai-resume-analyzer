@@ -188,28 +188,28 @@ You may still parse the JD into a structured internal shape to improve consisten
 - .NET 10 Minimal API project
 - `POST /api/analyze` stub returning mock JSON
 
-### M1 — Ingestion + extraction (no AI yet)
+### M1 — Ingestion + extraction (COMPLETED)
 - Accept multipart with JD + files[] + zipFile
 - Recursive zip expansion
 - Extract text from TXT/DOCX/PDF(text)
 - Return extracted text lengths + filenames (debug response)
 
-### M2 — AI: job parsing + resume parsing
+### M2 — AI: job parsing + resume parsing (COMPLETED)
 - Ollama client
 - `JobParser` prompt → JobProfile JSON
 - `ResumeParser` prompt → CandidateProfile JSON
 - Schema validation + retry-on-invalid-json
 
-### M3 — AI: match scoring (single score)
+### M3 — AI: match scoring (single score) (COMPLETED)
 - `Matcher` prompt → MatchResult JSON
 - Apply thresholds config
 - Response includes job + results
 
-### M4 — Hardening
+### M4 — Hardening (COMPLETED)
 - File limits, timeouts, safe temp handling, no sensitive logs
 - Better error reporting per resume (failed vs processed)
 
-### M5 — Export (optional)
+### M5 — Export (COMPLETED)
 - Server-side PDF generation from result JSON
 
 ---

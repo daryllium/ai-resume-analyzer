@@ -4,7 +4,7 @@ namespace AiResumeAnalyzer.Api.Services;
 
 public sealed class TextInputExtractor : ITextInputExtractor
 {
-    public async Task<ExtractResponse> ExtractTextInputAsync(List<string> textInputs)
+    public async Task<ExtractResponse> ExtractTextInputAsync(List<string> textInputs, CancellationToken cancellationToken = default)
     {
         var items = new List<ExtractItemResult>();
 

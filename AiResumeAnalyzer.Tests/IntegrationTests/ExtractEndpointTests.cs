@@ -149,7 +149,7 @@ public class ExtractEndpointTests(WebApplicationFactory factory)
         var response = await _client.PostAsync("/api/extract", form);
 
         // Assert
-        response.EnsureSuccessStatusCode(); // Should still return 200 but with error in response
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

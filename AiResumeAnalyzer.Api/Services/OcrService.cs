@@ -1,12 +1,16 @@
 using System.Text;
+using AiResumeAnalyzer.Api.Options;
 using AiResumeAnalyzer.Api.Services.Interfaces;
+using Microsoft.Extensions.Options;
 using PDFtoImage;
 using Tesseract;
 
 namespace AiResumeAnalyzer.Api.Services;
 
-public sealed class OcrService(ILogger<OcrService> logger) : IOcrService, IDisposable
+public sealed class OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> logger)
+    : IOcrService, IDisposable
 {
+    private readonly OcrOptions _ocrOptions = ocrOptions.Value;
     private readonly ILogger<OcrService> _logger = logger;
     private readonly string _tessDataPath = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory,
@@ -18,25 +22,40 @@ public sealed class OcrService(ILogger<OcrService> logger) : IOcrService, IDispo
         CancellationToken cancellationToken = default
     )
     {
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        linkedCts.CancelAfter(TimeSpan.FromSeconds(_ocrOptions.TimeoutSeconds));
+
         try
         {
             if (imageStream.CanSeek)
                 imageStream.Position = 0;
 
-            using var engine = new TesseractEngine(_tessDataPath, "eng", EngineMode.Default);
+            using var engine = new TesseractEngine(
+                _tessDataPath,
+                _ocrOptions.Language,
+                EngineMode.Default
+            );
 
             // Tesseract requires a Pix object or a file path.
             // We can load from stream by converting to byte array.
             using var ms = new MemoryStream();
-            await imageStream.CopyToAsync(ms, cancellationToken);
+            await imageStream.CopyToAsync(ms, linkedCts.Token);
             var imageBytes = ms.ToArray();
 
             using var img = Pix.LoadFromMemory(imageBytes);
             using var page = engine.Process(img);
 
-            cancellationToken.ThrowIfCancellationRequested();
+            linkedCts.Token.ThrowIfCancellationRequested();
 
             return page.GetText();
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(
+                "OCR Image extraction timed out after {Timeout}s.",
+                _ocrOptions.TimeoutSeconds
+            );
+            return "[OCR Timeout]";
         }
         catch (OperationCanceledException)
         {
@@ -56,6 +75,9 @@ public sealed class OcrService(ILogger<OcrService> logger) : IOcrService, IDispo
     )
     {
         var sb = new StringBuilder();
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        linkedCts.CancelAfter(TimeSpan.FromSeconds(_ocrOptions.TimeoutSeconds));
+
         try
         {
             if (pdfStream.CanSeek)
@@ -70,7 +92,7 @@ public sealed class OcrService(ILogger<OcrService> logger) : IOcrService, IDispo
 
             foreach (var pageImage in Conversion.ToImages(pdfStream))
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                linkedCts.Token.ThrowIfCancellationRequested();
 
                 pageCount++;
                 _logger.LogDebug("OCR Processing page {Page}", pageCount);
@@ -79,12 +101,21 @@ public sealed class OcrService(ILogger<OcrService> logger) : IOcrService, IDispo
                 pageImage.Encode(ms, SkiaSharp.SKEncodedImageFormat.Png, 100);
                 ms.Position = 0;
 
-                var text = await ExtractTextFromImageAsync(ms, cancellationToken);
+                var text = await ExtractTextFromImageAsync(ms, linkedCts.Token);
                 sb.AppendLine(text);
 
                 pageImage.Dispose();
             }
 
+            return sb.ToString();
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(
+                "OCR PDF page extraction timed out after {Timeout}s.",
+                _ocrOptions.TimeoutSeconds
+            );
+            sb.AppendLine("[OCR Timeout]");
             return sb.ToString();
         }
         catch (OperationCanceledException)
